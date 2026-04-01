@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "QuizResult": {
+      "title": "Quiz Result",
+      "description": "Stores the outcome of a user's quiz session.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the user." },
+        "username": { "type": "string", "description": "The display name of the user." },
+        "score": { "type": "integer" },
+        "totalQuestions": { "type": "integer" },
+        "percentage": { "type": "number" },
+        "difficulty": { "type": "string" },
+        "topics": { "type": "array", "items": { "type": "string" } },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "wrongQuestions": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "question": { "type": "string" },
+              "userAnswer": { "type": "string" },
+              "correctAnswer": { "type": "string" },
+              "explanation": { "type": "string" },
+              "topic": { "type": "string" }
+            }
+          }
+        },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "username", "score", "totalQuestions", "percentage", "timestamp", "startTime", "endTime"]
+    },
+    "WrongQuestion": {
+      "title": "Wrong Question",
+      "description": "Tracks a specific question a user got wrong for spaced repetition.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "topic": { "type": "string" },
+        "questionData": { "type": "object" },
+        "lastWrongTimestamp": { "type": "string", "format": "date-time" },
+        "isResolved": { "type": "boolean", "description": "Whether the user has since answered this correctly." }
+      },
+      "required": ["userId", "topic", "questionData", "lastWrongTimestamp"]
+    },
+    "QuestionPool": {
+      "title": "Question Pool",
+      "description": "A pre-generated question stored in the database for fast retrieval.",
+      "type": "object",
+      "properties": {
+        "topic": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "question": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "correctAnswerIndex": { "type": "integer" },
+        "explanation": { "type": "string" },
+        "codeSnippet": { "type": "string" },
+        "usageCount": { "type": "integer", "description": "How many times this question has been served." }
+      },
+      "required": ["topic", "difficulty", "question", "options", "correctAnswerIndex", "explanation"]
+    },
+    "UserQuestionHistory": {
+      "title": "User Question History",
+      "description": "Tracks when a user saw a question and if they got it right.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "questionId": { "type": "string" },
+        "topic": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "lastAsked": { "type": "string", "format": "date-time" },
+        "isCorrect": { "type": "boolean" }
+      },
+      "required": ["userId", "questionId", "topic", "difficulty", "lastAsked", "isCorrect"]
+    }
+  },
+  "firestore": {
+    "/results/{resultId}": {
+      "schema": "QuizResult",
+      "description": "Collection of all quiz results."
+    },
+    "/wrongQuestions/{wrongId}": {
+      "schema": "WrongQuestion",
+      "description": "Individual wrong questions for spaced repetition."
+    },
+    "/questions/{questionId}": {
+      "schema": "QuestionPool",
+      "description": "Pool of pre-generated questions."
+    },
+    "/userQuestionHistory/{historyId}": {
+      "schema": "UserQuestionHistory",
+      "description": "History of questions seen by users."
+    }
+  }
+}

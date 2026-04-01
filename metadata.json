@@ -1,0 +1,5 @@
+{
+  "name": "Python Mastery Quiz",
+  "description": "An interactive Python learning platform with multiple-choice questions, topic selection, and an integrated code execution environment.",
+  "requestFramePermissions": []
+}

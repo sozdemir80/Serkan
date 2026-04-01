@@ -1,0 +1,166 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: whitelist
+// Document ID: auto-generated
+// Fields:
+//   - email: string (required) - The email address allowed to access.
+//   - addedBy: string (optional) - UID of the admin who added it.
+//   - addedAt: timestamp (optional)
+//
+// ===============================================================
+//
+// Collection: results
+// Document ID: auto-generated
+// Fields:
+//   - userId: string (required) - The UID of the user.
+//   - username: string (required) - The display name of the user.
+//   - score: number (required) - Number of correct answers.
+//   - totalQuestions: number (required) - Total questions in the quiz.
+//   - percentage: number (required) - Success percentage.
+//   - difficulty: string (optional) - Easy, Medium, or Hard.
+//   - topics: list (optional) - List of topics selected.
+//   - startTime: timestamp (required) - When the quiz started.
+//   - endTime: timestamp (required) - When the quiz ended.
+//   - wrongQuestions: list (optional) - List of objects containing question details for mistakes.
+//   - timestamp: timestamp (required) - When the quiz was completed.
+//
+// Collection: wrongQuestions
+// Document ID: auto-generated
+// Fields:
+//   - userId: string (required)
+//   - topic: string (required)
+//   - questionData: map (required)
+//   - lastWrongTimestamp: timestamp (required)
+//   - isResolved: bool (optional)
+//
+// Collection: questions
+// Document ID: auto-generated
+// Fields:
+//   - topic: string (required)
+//   - difficulty: string (required)
+//   - question: string (required)
+//   - options: list (required)
+//   - correctAnswerIndex: number (required)
+//   - explanation: string (required)
+//   - codeSnippet: string (optional)
+//   - usageCount: number (optional)
+//
+// Collection: userQuestionHistory
+// Document ID: userId_questionId
+// Fields:
+//   - userId: string (required)
+//   - questionId: string (required)
+//   - topic: string (required)
+//   - difficulty: string (required)
+//   - lastAsked: timestamp (required)
+//   - isCorrect: bool (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email.lower() == "sozdemir80@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isWhitelisted() {
+      return isAuthenticated() && (
+        isAdmin() || 
+        exists(/databases/$(database)/documents/whitelist/$(request.auth.token.email.lower()))
+      );
+    }
+
+    function isValidResult(data) {
+      return data.userId is string &&
+             data.username is string &&
+             data.score is number &&
+             data.totalQuestions is number &&
+             data.percentage is number &&
+             data.timestamp is timestamp &&
+             data.startTime is timestamp &&
+             data.endTime is timestamp;
+    }
+
+    function isValidWrongQuestion(data) {
+      return data.userId is string &&
+             data.topic is string &&
+             data.questionData is map &&
+             data.lastWrongTimestamp is timestamp;
+    }
+
+    function isValidQuestionPool(data) {
+      return data.topic is string &&
+             data.difficulty is string &&
+             data.question is string &&
+             data.options is list &&
+             data.correctAnswerIndex is number &&
+             data.explanation is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /results/{resultId} {
+      // Users can see their own results, Admin can see all
+      allow read: if isWhitelisted() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Any authenticated user can create a result
+      allow create: if isWhitelisted() && isValidResult(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      
+      // Results are immutable
+      allow update, delete: if isAdmin();
+    }
+
+    match /wrongQuestions/{wrongId} {
+      allow read: if isWhitelisted() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isWhitelisted() && isValidWrongQuestion(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isWhitelisted() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /questions/{questionId} {
+      allow read: if isWhitelisted();
+      allow create: if isWhitelisted() && isValidQuestionPool(request.resource.data);
+      allow update: if isWhitelisted() && (isAdmin() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usageCount']));
+      allow delete: if isAdmin();
+    }
+
+    match /whitelist/{email} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /userQuestionHistory/{historyId} {
+      allow read: if isWhitelisted() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isWhitelisted() && request.resource.data.userId == request.auth.uid;
+      allow update: if isWhitelisted() && request.resource.data.userId == request.auth.uid && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+  }
+}
